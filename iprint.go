@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"strings"
 )
 
 func val2val(val reflect.Value) reflect.Value {
@@ -18,24 +19,26 @@ func val2val(val reflect.Value) reflect.Value {
 }
 
 func obj2json(v interface{}) (ret interface{}) {
+	if v == nil {
+		return nil
+	}
+
+	typ := reflect.TypeOf(v)
+	if typ.Implements(reflect.TypeOf((*json.Marshaler)(nil)).Elem()) {
+		ret = v
+		return
+	}
+	if typ.Implements(reflect.TypeOf((*error)(nil)).Elem()) || typ.Implements(reflect.TypeOf((*fmt.Stringer)(nil)).Elem()) {
+		ret = fmt.Sprintf("%v", v)
+		return
+	}
+
 	val := val2val(reflect.ValueOf(v))
 	if !val.IsValid() {
 		return
 	}
-	typ := val.Type()
 
-	if reflect.TypeOf(v).Implements(reflect.TypeOf((*json.Marshaler)(nil)).Elem()) {
-		ret = v
-		return
-	}
-
-	if reflect.TypeOf(v).Implements(reflect.TypeOf((*error)(nil)).Elem()) {
-		err := fmt.Sprintf("%v", v)
-		if err != "" {
-			ret = err
-			return
-		}
-	}
+	typ = val.Type()
 
 	switch typ.Kind() {
 	case reflect.Slice:
@@ -62,7 +65,18 @@ func obj2json(v interface{}) (ret interface{}) {
 			if f.PkgPath != "" {
 				continue
 			}
+
+			tag := f.Tag.Get("json")
+			if tag == "-" {
+				continue
+			}
+
 			name := f.Name
+			if tag != "" {
+				if n := strings.Split(tag, ",")[0]; n != "" {
+					name = n
+				}
+			}
 			fv := val.FieldByIndex(f.Index)
 			m[name] = obj2json(fv.Interface())
 		}
@@ -76,7 +90,7 @@ func obj2json(v interface{}) (ret interface{}) {
 
 func IprintD(a ...interface{}) {
 	for _, v := range a {
-		bs, err := json.MarshalIndent(obj2json(v), "", "  ")
+		bs, err := json.Marshal(obj2json(v))
 		if err != nil {
 			log.Println(err)
 			return
@@ -88,14 +102,16 @@ func IprintD(a ...interface{}) {
 
 func Iprint(a ...interface{}) string {
 	buf := new(bytes.Buffer)
-	for _, v := range a {
-		bs, err := json.MarshalIndent(obj2json(v), "", "  ")
+	for pos, v := range a {
+		if pos > 0 {
+			buf.WriteByte('\n')
+		}
+		bs, err := json.Marshal(obj2json(v))
 		if err != nil {
 			buf.WriteString(err.Error())
 		} else {
 			buf.Write(bs)
 		}
-		buf.WriteByte('\n')
 	}
 	return buf.String()
 }
