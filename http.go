@@ -187,7 +187,7 @@ func sendHttpRequest(method string, gpp *GPP) (body []byte, err error) {
 		*statusCodeRet = resp.StatusCode
 	} else {
 		if g, e := resp.StatusCode, http.StatusOK; g != e {
-			err = fmt.Errorf("http resp code: %d", g)
+			err = fmt.Errorf("http resp code: %d, body: %s", g, body)
 			return
 		}
 	}
