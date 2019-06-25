@@ -1,13 +1,21 @@
 package utils
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
 	"log"
 	"math"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
+
+	"github.com/simplejia/namecli/api"
 )
 
 func RemoveAnnotation(src []byte) []byte {
@@ -164,4 +172,58 @@ func GroupByNum(p interface{}, n int) (r interface{}) {
 
 	r = tmp.Interface()
 	return
+}
+
+func TestPost(h http.HandlerFunc, params interface{}) (body []byte, err error) {
+	v, err := json.Marshal(params)
+	if err != nil {
+		return
+	}
+	r, err := http.NewRequest(http.MethodPost, "", bytes.NewReader(v))
+	if err != nil {
+		return
+	}
+	w := httptest.NewRecorder()
+	h(w, r)
+	body = w.Body.Bytes()
+	if g, e := w.Code, http.StatusOK; g != e {
+		err = fmt.Errorf("http resp status not ok: %s", http.StatusText(g))
+		return
+	}
+	return
+}
+
+func NameWrap(name string) (addr string, err error) {
+	if strings.HasSuffix(name, ".ns") {
+		return api.Name(name)
+	}
+
+	return name, nil
+}
+
+func GetTrace(b IBase) *Trace {
+	trace, ok := b.GetParam(KeyTrace)
+	if !ok {
+		return nil
+	}
+
+	return trace.(*Trace)
+}
+
+func TraceMe(trace *Trace, name string, a ...interface{}) func() {
+	if trace == nil || name == "" {
+		return func() {}
+	}
+
+	bt := time.Now()
+	return func() {
+		trace.Mu.Lock()
+		defer trace.Mu.Unlock()
+
+		trace.Procs = append(trace.Procs, &TraceProc{
+			Name: name,
+			Dur:  time.Since(bt).String(),
+			Args: a,
+		})
+	}
 }
