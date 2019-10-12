@@ -39,9 +39,10 @@ func NewServer(addr string, handler http.Handler, shutdownTime, startTime, timeo
 
 	return &Server{
 		server: &http.Server{
-			Addr:        addr,
-			Handler:     handler,
-			ReadTimeout: timeout,
+			Addr:         addr,
+			Handler:      handler,
+			ReadTimeout:  timeout,
+			WriteTimeout: timeout,
 		},
 
 		isGraceful:   isGraceful,
