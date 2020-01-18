@@ -2,13 +2,9 @@ package utils
 
 import (
 	"encoding/json"
-	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
-	"os"
 	"sync/atomic"
-	"syscall"
 )
 
 const (
@@ -68,13 +64,7 @@ func (base *Base) ReadBody(r *http.Request) (body []byte) {
 		return
 	}
 
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		if err != http.ErrBodyReadAfterClose && err != io.ErrUnexpectedEOF {
-			panic(err)
-		}
-		return
-	}
+	body, _ = ioutil.ReadAll(r.Body)
 
 	base.SetParam(KeyBody, body)
 
@@ -100,16 +90,7 @@ func (base *Base) ReplyRaw(w http.ResponseWriter, data []byte) {
 		close(done)
 	}
 
-	if _, err := w.Write(data); err != nil {
-		if opErr, ok := err.(*net.OpError); ok {
-			if opErr.Timeout() {
-				return
-			} else if sysErr, ok := opErr.Err.(*os.SyscallError); ok && sysErr.Err == syscall.EPIPE {
-				return
-			}
-		}
-		panic(err)
-	}
+	w.Write(data)
 
 	if ctxDoneI, ok := base.GetParam(KeyCtxDone); ok {
 		ctxDone := ctxDoneI.(chan struct{})
